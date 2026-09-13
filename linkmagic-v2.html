@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkMagic — Short Link + OG Preview Generator</title>
+<style>
+  :root{
+    --bg:#0d1117;
+    --panel:#151b23;
+    --border:#232b36;
+    --text:#e6edf3;
+    --muted:#8b949e;
+    --accent:#3fb950;
+    --accent-dim:#1f4a29;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:20px 14px 60px;
+  }
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-size:1.4rem;margin:6px 0 2px;letter-spacing:-0.02em;}
+  .sub{color:var(--muted);font-size:0.88rem;margin:0 0 20px;line-height:1.5;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  .tab{
+    flex:1;text-align:center;padding:10px 6px;font-size:0.85rem;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;
+  }
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  label{display:block;font-size:0.8rem;color:var(--muted);margin:16px 0 6px;}
+  input, textarea{
+    width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);
+    padding:11px 12px;border-radius:8px;font-size:0.95rem;font-family:inherit;
+  }
+  input:focus, textarea:focus{outline:none;border-color:var(--accent);}
+  textarea{resize:vertical;min-height:60px;}
+  .hint{font-size:0.75rem;color:var(--muted);margin-top:4px;}
+  .row{display:flex;gap:8px;}
+  .row input{flex:1;}
+
+  .file-label{
+    display:block;
+    margin:14px 0 6px;
+    background:var(--accent-dim);
+    color:var(--accent);
+    border:1px solid var(--accent);
+    padding:12px;
+    border-radius:8px;
+    font-size:0.88rem;
+    text-align:center;
+    cursor:pointer;
+  }
+  input[type="file"]{
+    width:100%;
+    color:var(--muted);
+    font-size:0.8rem;
+    padding:8px 0;
+  }
+
+  button{
+    background:var(--accent);color:#04220a;border:none;padding:11px 16px;
+    border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;
+  }
+  button.secondary{
+    background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);
+  }
+  button.generate{width:100%;margin-top:22px;padding:14px;font-size:1rem;}
+  button:active{opacity:0.85;}
+
+  .output{margin-top:26px;display:none;}
+  .output.show{display:block;}
+  .output-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .output-label span{font-size:0.85rem;color:var(--muted);}
+
+  pre{
+    background:#010409;border:1px solid var(--border);border-radius:8px;padding:14px;
+    overflow-x:auto;font-family:var(--mono);font-size:0.76rem;line-height:1.5;
+    color:#c9d1d9;white-space:pre-wrap;word-break:break-all;max-height:320px;
+  }
+
+  .shortlink-box{
+    margin-top:18px;background:var(--panel);border:1px solid var(--accent);border-radius:8px;
+    padding:14px;
+  }
+  .shortlink-box .label{font-size:0.75rem;color:var(--muted);margin-bottom:6px;}
+  .shortlink-box .code{font-family:var(--mono);font-size:1rem;color:var(--accent);word-break:break-all;}
+  .shortlink-box .path-hint{font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+
+  .preview-card{
+    margin-top:22px;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+    background:var(--panel);display:none;
+  }
+  .preview-card.show{display:block;}
+  .preview-img{width:100%;aspect-ratio:1.91/1;object-fit:cover;background:#000;display:block;}
+  .preview-body{padding:12px 14px;}
+  .preview-domain{font-size:0.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+  .preview-title{font-size:0.95rem;font-weight:600;margin:4px 0 2px;}
+  .preview-desc{font-size:0.82rem;color:var(--muted);}
+
+  .note{
+    margin-top:22px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);
+    border-left:3px solid var(--accent);border-radius:6px;font-size:0.8rem;color:var(--muted);line-height:1.6;
+  }
+  .note b{color:var(--text);}
+
+  /* Dashboard */
+  .link-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:12px 14px;margin-bottom:10px;
+  }
+  .link-card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .link-card .code{font-family:var(--mono);color:var(--accent);font-size:0.9rem;}
+  .link-card .clicks{
+    background:var(--accent-dim);color:var(--accent);font-size:0.75rem;
+    padding:2px 8px;border-radius:10px;white-space:nowrap;
+  }
+  .link-card .title{font-size:0.85rem;margin-top:4px;}
+  .link-card .target{font-size:0.72rem;color:var(--muted);margin-top:2px;word-break:break-all;}
+  .empty{color:var(--muted);font-size:0.85rem;text-align:center;padding:30px 10px;}
+  .del-btn{background:none;border:none;color:#f85149;font-size:0.75rem;cursor:pointer;padding:2px 4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LinkMagic</h1>
+  <p class="sub">Short link + OG preview generator with click tracking — copy-paste-ready HTML for GitHub Pages / Netlify.</p>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="create" onclick="switchTab('create')">Create Link</div>
+    <div class="tab" data-tab="dashboard" onclick="switchTab('dashboard')">My Links</div>
+  </div>
+
+  <!-- CREATE PANEL -->
+  <div class="panel active" id="panel-create">
+
+    <label for="siteName">Your Domain</label>
+    <input id="siteName" type="text" placeholder="trickizm.com" value="trickizm.com" />
+    <div class="hint">Bina https:// ke — jahan aap ye tool host karoge</div>
+
+    <label for="targetUrl">Target URL (where user goes)</label>
+    <input id="targetUrl" type="url" placeholder="https://trickizm.com/your-post" />
+
+    <label for="imgUrl">Preview Image</label>
+    <input id="imgUrl" type="url" placeholder="https://trickizm.com/images/thumb.jpg" />
+    <div class="hint" id="imgHint">Recommended: 1200×630px, hosted (not Google Photos/Drive)</div>
+
+    <label for="galleryPick" class="file-label">🖼️ Tap here to pick from Gallery</label>
+    <input type="file" id="galleryPick" accept="image/*" onchange="onGalleryPick(event)" />
+
+    <img id="galleryPreview" style="display:none;width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-top:8px;border:1px solid var(--border);" />
+    <div class="hint" id="uploadReminder" style="display:none;color:#e3b341;">⚠️ Ye sirf local preview hai — is picture ko pehle kahin host karo (imgbb.com, GitHub, ya apni site per upload karke) aur uska link upar wale URL field mein daalo, tabhi Facebook per dikhegi.</div>
+
+    <label for="titleTxt">Title</label>
+    <input id="titleTxt" type="text" maxlength="90" placeholder="Your catchy title here" />
+
+    <label for="descTxt">Description</label>
+    <textarea id="descTxt" maxlength="200" placeholder="Short description shown under the title"></textarea>
+
+    <label for="shortCode">Short Code</label>
+    <div class="row">
+      <input id="shortCode" type="text" placeholder="ab3k9" maxlength="12" />
+      <button class="secondary" onclick="randomCode()">🎲 Random</button>
+    </div>
+    <div class="hint">Ye path banega: /x/[code]/ — sirf letters/numbers use karo</div>
+
+    <button class="generate" onclick="generateCode()">Generate Short Link</button>
+
+    <div class="shortlink-box" id="shortlinkBox" style="display:none;">
+      <div class="label">Your short link will be:</div>
+      <div class="code" id="shortlinkText"></div>
+      <div class="path-hint">Is code wali folder banao apne repo mein (neeche diye instructions dekho), tab ye link live hoga.</div>
+    </div>
+
+    <div class="preview-card" id="previewCard">
+      <img id="prevImg" class="preview-img" src="" alt="preview" />
+      <div class="preview-body">
+        <div class="preview-domain" id="prevDomain">trickizm.com</div>
+        <div class="preview-title" id="prevTitle">Title</div>
+        <div class="preview-desc" id="prevDesc">Description</div>
+      </div>
+    </div>
+
+    <div class="output" id="output">
+      <div class="output-label">
+        <span>index.html — put inside /x/[code]/ folder</span>
+        <button class="secondary" id="copyBtn" onclick="copyCode()">Copy</button>
+      </div>
+      <pre id="codeBlock"></pre>
+    </div>
+
+    <div class="note">
+      <b>Spam se bachne ke liye:</b> sirf clean OG tags + seedha redirect, koi cloaking nahi. Click count ek free counter API (CountAPI) se track hota hai — koi backend setup nahi chahiye.
+    </div>
+
+    <div class="note">
+      <b>Deploy karne ka tareeka:</b> Apne GitHub repo mein <code>/x/[aapka-code]/</code> naam ka folder banao, usme upar wala HTML <code>index.html</code> naam se save karo, commit karo. Final link: <code>https://username.github.io/repo/x/code/</code> — ya apne custom domain per.
+    </div>
+  </div>
+
+  <!-- DASHBOARD PANEL -->
+  <div class="panel" id="panel-dashboard">
+    <div id="linksList"></div>
+  </div>
+
+</div>
+
+<script>
+let currentLink = null;
+
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  document.getElementById('panel-create').classList.toggle('active', tab==='create');
+  document.getElementById('panel-dashboard').classList.toggle('active', tab==='dashboard');
+  if(tab==='dashboard') renderDashboard();
+}
+
+function onGalleryPick(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  const img = document.getElementById('galleryPreview');
+  img.src = url;
+  img.style.display = 'block';
+  document.getElementById('uploadReminder').style.display = 'block';
+  // Also feed the live OG-card preview so user sees how it'll look
+  document.getElementById('prevImg').src = url;
+  document.getElementById('previewCard').classList.add('show');
+}
+
+function randomCode(){
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let code = '';
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  document.getElementById('shortCode').value = code;
+}
+
+function esc(str){
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getSavedLinks(){
+  try{ return JSON.parse(localStorage.getItem('linkmagic_links') || '[]'); }
+  catch(e){ return []; }
+}
+function saveLinkRecord(rec){
+  const links = getSavedLinks();
+  links.unshift(rec);
+  localStorage.setItem('linkmagic_links', JSON.stringify(links));
+}
+function deleteLink(code){
+  const links = getSavedLinks().filter(l=>l.code!==code);
+  localStorage.setItem('linkmagic_links', JSON.stringify(links));
+  renderDashboard();
+}
+
+function generateCode(){
+  const site = (document.getElementById('siteName').value.trim() || 'trickizm.com').replace(/^https?:\/\//,'').replace(/\/$/,'');
+  const url = document.getElementById('targetUrl').value.trim();
+  const img = document.getElementById('imgUrl').value.trim();
+  const title = document.getElementById('titleTxt').value.trim() || 'Untitled';
+  const desc = document.getElementById('descTxt').value.trim() || '';
+  let code = document.getElementById('shortCode').value.trim();
+
+  if(!url){ alert('Target URL zaroori hai'); return; }
+  if(!code){ randomCode(); code = document.getElementById('shortCode').value.trim(); }
+  code = code.replace(/[^a-zA-Z0-9\-]/g,'');
+  document.getElementById('shortCode').value = code;
+
+  const counterNamespace = site.replace(/[^a-zA-Z0-9]/g,'') || 'linkmagic';
+  const shortUrl = `https://${site}/x/${code}/`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${esc(title)}</title>
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="${esc(shortUrl)}">
+<meta property="og:title" content="${esc(title)}">
+<meta property="og:description" content="${esc(desc)}">
+<meta property="og:image" content="${esc(img)}">
+<meta property="og:site_name" content="${esc(site)}">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(desc)}">
+<meta name="twitter:image" content="${esc(img)}">
+
+<script>
+  // Click tracking (free CountAPI, no signup) then redirect
+  fetch("https://api.countapi.xyz/hit/${counterNamespace}/${code}")
+    .catch(function(){})
+    .finally(function(){
+      window.location.replace("${url.replace(/"/g,'\\"')}");
+    });
+  // Fallback in case fetch hangs
+  setTimeout(function(){ window.location.replace("${url.replace(/"/g,'\\"')}"); }, 1200);
+<\/script>
+</head>
+<body>
+  <p>Redirecting to <a href="${esc(url)}">${esc(title)}</a>...</p>
+</body>
+</html>`;
+
+  document.getElementById('codeBlock').textContent = html;
+  document.getElementById('output').classList.add('show');
+
+  document.getElementById('shortlinkText').textContent = shortUrl;
+  document.getElementById('shortlinkBox').style.display = 'block';
+
+  document.getElementById('prevImg').src = img || 'https://via.placeholder.com/1200x630/151b23/8b949e?text=No+Image';
+  document.getElementById('prevDomain').textContent = site;
+  document.getElementById('prevTitle').textContent = title;
+  document.getElementById('prevDesc').textContent = desc;
+  document.getElementById('previewCard').classList.add('show');
+
+  saveLinkRecord({code, site, url, title, desc, img, shortUrl, counterNamespace, created: Date.now()});
+
+  document.getElementById('output').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function copyCode(){
+  const code = document.getElementById('codeBlock').textContent;
+  navigator.clipboard.writeText(code).then(()=>{
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    setTimeout(()=>{ btn.textContent='Copy'; }, 1500);
+  });
+}
+
+async function renderDashboard(){
+  const list = document.getElementById('linksList');
+  const links = getSavedLinks();
+  if(links.length===0){
+    list.innerHTML = '<div class="empty">Abhi koi link generate nahi hua. "Create Link" tab mein jaake shuru karo.</div>';
+    return;
+  }
+  list.innerHTML = links.map(l => `
+    <div class="link-card" id="card-${l.code}">
+      <div class="top">
+        <div>
+          <div class="code">/x/${esc(l.code)}/</div>
+          <div class="title">${esc(l.title)}</div>
+          <div class="target">→ ${esc(l.url)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="clicks" id="clicks-${l.code}">…</div><br/>
+          <button class="del-btn" onclick="deleteLink('${l.code}')">Remove</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Fetch live click counts
+  for(const l of links){
+    try{
+      const res = await fetch(`https://api.countapi.xyz/get/${l.counterNamespace}/${l.code}`);
+      const data = await res.json();
+      const el = document.getElementById(`clicks-${l.code}`);
+      if(el) el.textContent = (data.value || 0) + ' clicks';
+    }catch(e){
+      const el = document.getElementById(`clicks-${l.code}`);
+      if(el) el.textContent = '— clicks';
+    }
+  }
+}
+</script>
+</body>
+</html>
